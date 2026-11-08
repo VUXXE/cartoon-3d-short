@@ -534,7 +534,7 @@ The `customDepthMaterial` (RGBADepthPacking, alphaTest 0.5) stays as it is. It a
 
 ### 9.6 Shadow-map settings
 
-- **Keep `shadows` (PCFSoftShadowMap).** mapSize 4096 and the existing focus-fitted frustum `Rr = clamp(dist·1.15 + 7, 12, 95)`.
+- **Keep `shadows={{ enabled: true, type: THREE.PCFShadowMap }}` (PCFShadowMap).** Three.js r163+ removed `PCFSoftShadowMap` in favor of `PCFShadowMap`. mapSize 4096 and the existing focus-fitted frustum `Rr = clamp(dist·1.15 + 7, 12, 95)`.
   - Texel = 2Rr/4096 (6 mm close-up, 4.6 cm wide).
   - In-focus edges stay 3-10 px @720, the same as the reference's 3-12. Do not add PCSS or big blur radii; DOF supplies the foreground softness.
 - **Bias.**
