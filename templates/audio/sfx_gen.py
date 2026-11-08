@@ -568,3 +568,172 @@ def stroll_step(r, scuff=0.5):
     tap = bp(nz, 700, 4000, 1) * np.exp(-t / 0.005) * 0.4
     sc = bp(nz, 400, 3000, 1) * np.clip(t / 0.02, 0, 1) * np.exp(-t / 0.07) * 0.25 * scuff
     return (heel * 0.7 + plank + tap + sc)
+
+
+# ================================================================ Tacoma Narrows "Galloping Gertie" generators
+def gale_wind(dur, r, gust=0.35, f_whistle=420):
+    """42 mph howling gale wind through Puget Sound canyon with aerodynamic whistling"""
+    n = ns(dur)
+    t = np.arange(n) / SR
+    noise = colored(n, r, 0.9)
+    low = lp(noise, 180, 2) * (0.7 + 0.6 * smooth_noise(n, r, 0.4))
+    mid = bp(noise, 250, 1600, 1) * (0.5 + 0.5 * smooth_noise(n, r, 0.25))
+    w_freq = f_whistle * (1 + 0.25 * smooth_noise(n, r, 0.6))
+    whistle = reson(r.standard_normal(n), float(f_whistle), 16) * 0.4 * (0.3 + 0.7 * smooth_noise(n, r, 0.5))
+    return fades(low * 1.2 + mid * 0.9 + whistle, 0.05, 0.1)
+
+def vintage_car(dur, r, rpm=900):
+    """1940 low-rpm flathead engine rumble + mechanical chug"""
+    n = ns(dur)
+    t = np.arange(n) / SR
+    f_fire = (rpm / 60.0) * 2.0
+    pulse = 0.5 + 0.5 * np.sin(phase(f_fire * (1 + 0.02 * smooth_noise(n, r, 0.8))))
+    exhaust = lp(r.standard_normal(n), 160, 2) * (pulse ** 2) * 1.5
+    rumble = reson(r.standard_normal(n), 68, 8) * 0.8
+    body = bp(r.standard_normal(n), 200, 800, 1) * 0.3
+    return fades((exhaust + rumble + body) * 0.6, 0.05, 0.05)
+
+def vintage_horn(r, dur=0.45):
+    """1940 classic dual-tone horn toot (370 Hz + 440 Hz)"""
+    n = ns(dur)
+    t = tt(dur)
+    env = np.clip(t / 0.02, 0, 1) * np.exp(-t / 0.3)
+    tone1 = np.sin(2 * np.pi * 370 * t) + 0.3 * np.sin(2 * np.pi * 740 * t)
+    tone2 = np.sin(2 * np.pi * 440 * t) + 0.3 * np.sin(2 * np.pi * 880 * t)
+    brass = (tone1 + tone2) * 0.5 * env
+    buzz = bp(r.standard_normal(n), 1200, 3500, 1) * np.exp(-t / 0.08) * 0.25
+    return fades(brass + buzz, 0.005, 0.04)
+
+def toll_coin(r):
+    """75-cent coin clink dropping into a metal toll hopper"""
+    d = 0.28
+    t = tt(d)
+    modes = [(3800, 1.0, 0.04), (5400, 0.7, 0.03), (7600, 0.4, 0.02), (9800, 0.2, 0.015)]
+    clink1 = modal(d, modes, r)
+    clink2 = modal(d, [(m[0] * 1.12, m[1] * 0.8, m[2]) for m in modes], r)
+    hit = bp(r.standard_normal(len(t)), 2500, 8000, 1) * np.exp(-t / 0.005) * 0.5
+    y = clink1 + hit
+    _place_mono(y, clink2 * 0.7, 0.04)
+    return fades(y, 0.001, 0.05)
+
+def car_bounce(r):
+    """Springy rubber tire thunk + car leaf-spring squeak as road dips and rises"""
+    d = 0.45
+    t = tt(d)
+    thump = lp(r.standard_normal(len(t)), 120, 2) * np.exp(-t / 0.04) * 1.5
+    squeak = creak(0.22, r, 580, 840, SMALLMETAL, [(0,0), (0.2,1), (0.8,0.7), (1,0)], rough=0.08, noise=0.02)
+    y = thump
+    _place_mono(y, squeak * 0.8, 0.03)
+    return fades(y, 0.005, 0.03)
+
+def rollercoaster_whoosh(dur, r):
+    """Rollercoaster track clatter + air crest whoosh"""
+    n = ns(dur)
+    t = tt(dur)
+    peak = 0.4 * dur
+    w = whoosh(dur, r, peak=peak, f_lo=200, f_hi=2400, width=0.8, tail=0.3, air=0.2)
+    trk = rattle(dur, r, density=45.0, heavy=True) * np.exp(-((t - peak) / 0.35) ** 2) * 0.6
+    return fades(w + trk, 0.05, 0.08)
+
+def seasick_wobble(r, dur=0.6):
+    """Queasy cartoon wobble / pitch vibrato flex"""
+    n = ns(dur)
+    t = tt(dur)
+    f0 = 120 + 25 * np.sin(2 * np.pi * 5.5 * t)
+    wob = np.sin(phase(f0)) * np.exp(-t / 0.35)
+    harm = 0.4 * np.sin(phase(f0 * 2)) * np.exp(-t / 0.35)
+    return fades(wob + harm, 0.01, 0.08)
+
+def torsion_groan(dur, r, intensity=1.0):
+    """Massive 45-degree torsional twisting of structural steel girders"""
+    n = ns(dur)
+    t = tt(dur)
+    modes = [(48, 12, 1.2), (92, 16, 1.0), (165, 20, 0.8), (280, 24, 0.6), (490, 28, 0.4), (880, 32, 0.25)]
+    cr = creak(dur, r, rate0=35, rate1=85, modes=modes, shape_pts=[(0,0), (0.2,1), (0.7,0.9), (1,0)], rough=0.18, noise=0.08, scale=1.0)
+    screech = bp(colored(n, r, 0.7), 1400, 3800, 1) * (0.4 + 0.6 * np.sin(np.pi * np.linspace(0, 1, n)) ** 2) * 0.35
+    low_boom = reson(r.standard_normal(n), 42, 6) * np.exp(-t / 0.8) * 0.8
+    return fades((cr + screech + low_boom) * intensity, 0.03, 0.06)
+
+def car_curb_slam(r):
+    """Coatsworth car skidding and slamming hard into the concrete bridge curb"""
+    d = 0.75
+    t = tt(d)
+    skid = bp(r.standard_normal(len(t)), 700, 3200, 1) * np.exp(-t / 0.2) * 0.9
+    slam = lp(r.standard_normal(len(t)), 180, 2) * np.exp(-t / 0.05) * 1.8
+    crunch = modal(d, [(220, 1.0, 0.08), (480, 0.7, 0.05), (1100, 0.5, 0.03), (2800, 0.3, 0.01)], r)
+    y = skid * 0.7
+    _place_mono(y, slam + crunch * 0.8, 0.08)
+    return fades(y, 0.005, 0.06)
+
+def crawling_knees(r):
+    """Hands and knees crawling scuff on gritty bridge pavement"""
+    d = 0.32
+    t = tt(d)
+    cloth = bp(r.standard_normal(len(t)), 400, 2200, 1) * np.clip(t / 0.015, 0, 1) * np.exp(-t / 0.09) * 0.8
+    grit = bp(r.standard_normal(len(t)), 1800, 5000, 1) * np.clip(t / 0.01, 0, 1) * np.exp(-t / 0.07) * 0.4
+    thud = lp(r.standard_normal(len(t)), 220, 2) * np.exp(-t / 0.03) * 0.5
+    return fades(cloth + grit + thud, 0.005, 0.03)
+
+def cable_twang(r, f0=280):
+    """High-tension suspension hanger cable snapping like a guitar string: PING/TWANG"""
+    d = 1.2
+    t = tt(d)
+    nz = r.standard_normal(len(t))
+    strike = bp(nz, 1800, 8000, 1) * np.exp(-t / 0.006) * 1.5
+    freq = f0 * (1 + 0.4 * np.exp(-t / 0.04))
+    twang = np.sin(phase(freq)) * np.exp(-t / 0.35)
+    twang_h2 = 0.5 * np.sin(phase(freq * 2.02)) * np.exp(-t / 0.25)
+    twang_h3 = 0.3 * np.sin(phase(freq * 3.05)) * np.exp(-t / 0.15)
+    modes = [(f0 * 1.5, 0.6, 0.12), (f0 * 2.8, 0.4, 0.08), (f0 * 4.2, 0.25, 0.04)]
+    res = modal(d, modes, r)
+    whip = bp(nz, 600, 3000, 1) * np.clip(t / 0.03, 0, 1) * np.exp(-t / 0.18) * 0.4
+    return fades(strike + (twang + twang_h2 + twang_h3 + res * 0.6) * 1.2 + whip, 0.001, 0.05)
+
+def dog_whimper(r, dur=0.55):
+    """Cute terrified dog whimper / short yip for Tubby (black cocker spaniel)"""
+    n = ns(dur)
+    t = tt(dur)
+    f0 = 750 + 450 * np.sin(np.pi * (t / dur)) ** 1.5
+    voice = np.sin(phase(f0)) * (0.5 + 0.5 * np.sin(np.pi * (t / dur))) ** 2
+    voice += 0.3 * np.sin(phase(f0 * 2)) * (0.5 + 0.5 * np.sin(np.pi * (t / dur))) ** 2
+    breath = bp(r.standard_normal(n), 1200, 3500, 1) * np.exp(-t / 0.15) * 0.12
+    return fades(voice * 0.7 + breath, 0.02, 0.06)
+
+def paper_flutter(dur, r):
+    """Puff of human breath + paper strip fluttering rapidly in airflow"""
+    n = ns(dur)
+    t = tt(dur)
+    breath = lp(colored(n, r, 0.6), 1100, 2) * np.exp(-((t - 0.1) / 0.15) ** 2) * 0.6
+    flap_rate = 32 + 8 * smooth_noise(n, r, 0.4)
+    flutter_env = (0.5 + 0.5 * np.sin(phase(flap_rate))) ** 3
+    flaps = bp(r.standard_normal(n), 600, 4200, 1) * flutter_env * np.clip(t / 0.05, 0, 1) * np.exp(-t / (dur * 0.8)) * 0.9
+    return fades(breath + flaps, 0.02, 0.04)
+
+def vortex_whoosh(dur, r, f_center=550):
+    """Aerodynamic vortex shedding whoosh (swirling eddy pushing span)"""
+    n = ns(dur)
+    t = tt(dur)
+    sweep = f_center * (1 + 0.4 * np.sin(2 * np.pi * (t / dur)))
+    w = reson(r.standard_normal(n), float(f_center), 6) * np.sin(np.pi * (t / dur)) * 0.9
+    air = bp(colored(n, r, 0.8), 200, 2200, 1) * np.sin(np.pi * (t / dur)) ** 2 * 0.5
+    return fades(w + air, 0.04, 0.06)
+
+def truss_wind(dur, r):
+    """Smooth laminar wind whistling gently through modern open steel trusses without turbulence"""
+    n = ns(dur)
+    t = tt(dur)
+    air = lp(colored(n, r, 0.9), 650, 2) * 0.7
+    harm1 = reson(r.standard_normal(n), 1150, 22) * 0.25
+    harm2 = reson(r.standard_normal(n), 1850, 26) * 0.18
+    return fades(air + harm1 + harm2, 0.1, 0.1)
+
+def gate_lock(r):
+    """Heavy iron toll gate / padlock locking shut CLANG-CLUNK"""
+    d = 0.8
+    t = tt(d)
+    strike = modal(d, [(480, 1.0, 0.08), (1150, 0.8, 0.05), (2400, 0.6, 0.03), (4800, 0.4, 0.015)], r)
+    thud = lp(r.standard_normal(len(t)), 95, 2) * np.exp(-t / 0.06) * 1.6
+    clank = modal(d, [(880, 0.7, 0.04), (1650, 0.5, 0.02)], r)
+    y = strike + thud
+    _place_mono(y, clank * 0.9, 0.07)
+    return fades(y, 0.002, 0.05)
