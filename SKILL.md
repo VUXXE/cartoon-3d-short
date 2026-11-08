@@ -90,10 +90,11 @@ User rules that apply:
 7. **Post** (`Bridge.tsx` + `ink.ts` + `lensblur.ts` + `grade.ts`).
    - Composer order: ink → lens pre → lens main → bloom → NEUTRAL tone map → grade (MSAA 4).
    - Every pixel parameter scales with output height / 1920.
-8. **Sound** (`~/bridge-short/audio/`: timeline.py, sfx_gen.py, sfx.py, music.py, instruments.py, dsp.py, mix.py).
-   - Event table → synthesized SFX plus an original score ducked under the voice.
-   - Output: mix.wav (48 kHz, exact length), stems and cues.md.
-   - Lock the picture's time constants before the sound is made. Any later timing change means re-running the sound.
+8. **Topic-Adaptive Sound & SFX Generation** (`audio/`: sfx.py, sfx_gen.py, mix.py, music.py, dsp.py).
+   - **For any topic:** Do not hardcode sounds from previous shorts. Run `python scripts/generate_sfx.py --project-dir . --render`.
+   - The generator scans `SCRIPT.md` and `voice/words.json`, identifies narrative keywords/action beats, builds layered ambience beds, and generates timestamped procedural sound cues from the 48+ DSP generators in `sfx_gen.py` (weather, vehicles, metal stress, cable snaps, impacts, splashes, foley scuffs, cartoon wobbles, and crowds).
+   - `audio/mix.py` masters the final audio to ITU-R BS.1770-4 compliance: **-15.0 LUFS**, True Peak **-1.2 dBTP**, with automated speech ducking and section rides.
+   - Output: `audio/mix.wav` (48 kHz stereo, exact length), stems (`stem_sfx.wav`, `stem_music.wav`, `stem_voice.wav`), and `cues.md`.
 9. **Look checks (GPU-accelerated stills).**
    - Run: `node scripts/bridge-stills.mjs out/<name>/x_ 100,400 0.5` (automatically runs with GPU rasterization and EGL/ANGLE hardware acceleration).
    - Make side-by-sides against reference frames with `python scripts/sbs_sheet.py out.jpg --ours ... --ref ...`.

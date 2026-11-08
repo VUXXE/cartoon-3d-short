@@ -23,6 +23,11 @@ Forked and expanded from [mromidev/claude-animated-shorts](https://github.com/mr
 3. **Polyfork 3D Premade Asset Library:**
    - Full offline database of [Polyfork Catalog](https://github.com/lucas-martinic/polyfork-catalog) (`references/polyfork/catalog.json`): **3,086 low-poly 3D models** across **47 themed kits** (Medieval Village, Little Tokyo, NYC, Nature, Space Base, Trains, etc.).
    - Asset CLI tool (`scripts/polyfork.py`): Search, inspect, and download optimized GLBs directly to `public/models/`.
+
+4. **Topic-Adaptive Procedural Sound Design (generate_sfx.py):**
+   - Automatically scans `SCRIPT.md` and `voice/words.json` to synthesize sound effects tailored to any new project topic (natural disasters, historical events, vehicles, space, nature, sci-fi).
+   - Rich procedural DSP engine (`templates/audio/sfx_gen.py`) with 48+ sound generators (weather, engines, metal stress, cable snaps, impacts, splashes, foley scuffs, cartoon boings, dog whimpers, and crowd reactions).
+   - Professional mastering to ITU-R BS.1770-4 (**-15.0 LUFS**, **-1.2 dBTP**) with speech ducking and section automation.
    - Three.js loader helper (`templates/bridge/polyfork.ts`): Automatically converts Polyfork models to two-tone Lambert shading and merges into the scene batch with ink outlines.
 
 4. **Linux / Arch GPU Hardware Acceleration:**
@@ -38,7 +43,7 @@ Forked and expanded from [mromidev/claude-animated-shorts](https://github.com/mr
 |---|---|
 | `SKILL.md` | The skill definition: full pipeline, rules, look values, and verification loops |
 | `templates/bridge/` | Complete Three.js & Remotion short template (`Bridge.tsx`, `world.ts`, `toon.ts`, `build.ts`, `story.ts`, `polyfork.ts`, `ink.ts`, etc.) |
-| `templates/scripts/` | Tooling: `generate_voice.py`, `polyfork.py`, `bridge-stills.mjs`, `sbs_sheet.py`, `short_qa.py` |
+| `templates/scripts/` | Tooling: `generate_voice.py`, `generate_sfx.py`, `polyfork.py`, `bridge-stills.mjs`, `sbs_sheet.py`, `short_qa.py` |
 | `templates/audio/` | Synthesized sound system: SFX generator, march music, ducking mix, and Mark voice preset |
 | `references/polyfork/` | Complete Polyfork 3D catalog: `catalog.json`, 47 kit markdown indexes, and guides |
 | `references/STYLE_BIBLE.md` | Script and visual formula measured from 20 reference shorts |
@@ -67,6 +72,9 @@ The agent follows `SKILL.md`: researching facts, drafting the beat-formula scrip
 # Generate Mark's voice with Chatterbox-Turbo and expressions:
 python scripts/generate_voice.py --out-dir ~/my-short/voice \
   --text "Wait, you thought that would work? [chuckle] That is ridiculous."
+
+# Generate sound effects tailored to the project topic:
+python scripts/generate_sfx.py --project-dir ./my-short --render
 
 # Search and download 3D assets from Polyfork:
 python scripts/polyfork.py search "house" --kit medieval-village-kit-ca0b43
