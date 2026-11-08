@@ -1,0 +1,19 @@
+# Python / Virtualenv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large downloaded model weights (Kokoro, Piper, Whisper caches)
+models/
+*.onnx
+*.bin
+
+# Test and temporary directories
+voice_samples/
+out/
+tmp/
+*.tmp*
+.cache/
+node_modules/
+.DS_Store

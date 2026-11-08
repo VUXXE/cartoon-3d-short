@@ -16,13 +16,16 @@ The style reference is a channel studied privately (`references/`: STYLE_BIBLE.m
 - Never say the channel's name in a voice-over or description.
 
 User rules that apply:
+- **Always use Mark for voiceover:** Synthesize narration using **Chatterbox TTS** cloning the **Mark ("Mark - Natural Conversations")** voice (`templates/audio/voices/mark.wav`), with optional expressive tags (`[chuckle]`, `[gasp]`, `[sigh]`).
+- **Premade 3D Asset Library (Polyfork):** Use **Polyfork Catalog** (`references/polyfork/`, 3,086 low-poly models across 47 themed kits) whenever assembling 3D scenery, buildings, nature, vehicles, props, or landmarks. Use `python scripts/polyfork.py` to search, inspect, download GLBs, or generate code snippets.
+- **Always render with GPU when available:** enforce hardware acceleration across WebGL (EGL/ANGLE), Remotion renders, Whisper alignment, and Chatterbox/Kokoro voice generation.
 - No captions or labels in the video.
 - English only.
-- Voice: one steady tone.
+- Voice: one steady conversational tone (or controlled expressive tags).
 - Jokes are researched real facts.
 - Standard mix: music +3 dB, SFX -6 dB, voice unchanged.
 - Final export 2K vertical: 1440x2560, `--scale 1.3333`.
-- Opus max verifies every check.
+- Model verification (Gemini Vision) verifies every look check.
 - Save after every step.
 - "Just do it" once the script is approved.
 
@@ -39,9 +42,22 @@ User rules that apply:
    - **Consequence:** the rule it created.
    - **Callback twist:** the ending.
    - Never describe on screen what the viewer already sees.
-3. **Voice.** Record or generate `voice.wav`, then make its word timings `words.json` (any speech-to-text with word times).
-   - Put them in the project folder, e.g. `~/bridge-short/voice/`.
-   - Hand-fix the word timings. Everything is timed to words.json.
+3. **Voice & Word Timings (`voice.wav` + `words.json`).**
+   Always use **Mark** via Chatterbox (the default in `scripts/generate_voice.py`):
+   ```bash
+   # Default: Generates Mark's voice using Chatterbox with GPU acceleration:
+   python scripts/generate_voice.py --out-dir ~/bridge-short/voice --script SCRIPT.md
+
+   # With expressive tags & custom emotion dial:
+   python scripts/generate_voice.py --out-dir ~/bridge-short/voice --script SCRIPT.md --exaggeration 0.35
+   ```
+   - **Mark Voice Profile (`templates/audio/voices/mark.wav`):** Natural conversational pacing, warm timbre, articulate storytelling delivery.
+   - **Chatterbox Expression Controls:**
+     - Tags: `[chuckle]`, `[gasp]`, `[sigh]`, `[pause]`, `[groan]`. These vocal reactions are synthesized in Mark's voice and timestamped into `words.json` so camera kicks and visual reactions land on the exact beat.
+     - `--exaggeration`: continuous control from `0.25` (deadpan BBC documentary style) to `0.35` (natural conversational) to `0.65+` (theatrical).
+   - **Output Format:**
+     - `voice.wav`: 48 kHz mono uncompressed WAV.
+     - `words.json`: `[{"w": "soldiers", "s": 0.42, "e": 0.88}, ...]`. Everything in `story.ts` and `mix.py` is timed to `words.json`.
 4. **Shot plan** in `story.ts`: copy `templates/bridge/` (the final bridge source, same as `src/videos/bridge/` of your Remotion project) to `src/videos/<name>/`, register a new composition next to `BridgeShort` in `src/Root.tsx`, and rename it.
    - `SHOTS`: id, a/b frames, light day/golden, crowd mode, `tau` story time.
    - `XFADE`: crossfades at place/time changes.
@@ -51,10 +67,20 @@ User rules that apply:
    - `DOF`/`dofAt`: lens blur per beat.
    - `FOREGROUND`: near framing props.
    - Every visual reaction lands 0-3 frames before its word.
-5. **World.**
+5. **World & Premade 3D Assets (Polyfork).**
+   - **Premade Assets from Polyfork Catalog (`references/polyfork/`):**
+     - Search 3,086+ low-poly models across 47 themed kits:
+       ```bash
+       python scripts/polyfork.py search "house" --kit medieval-village-kit-ca0b43
+       python scripts/polyfork.py kits
+       python scripts/polyfork.py download a-frame-cabin-6cb550 --out-dir ./public/models
+       python scripts/polyfork.py snippet a-frame-cabin-6cb550
+       ```
+     - Load via `loadPolyforkKit(["a-frame-cabin-6cb550", ...])` from `polyfork.ts`.
+     - Place in scene via `placePolyforkProp(batch, model, x, y, z, height, yaw)`. Models automatically convert to two-tone cartoon shading (`toLambert()`) and receive the ink outline pass.
    - `lights.ts`: LIGHTS plus the LOOK sky/river/cloud palette per light.
    - `shade.ts`: two-tone shading and `untone()`.
-   - `build.ts`: town, houses and Kenney CC0 kit props, recoloured, with sight-line culling of anything blocking a camera.
+   - `build.ts`: town, houses and Polyfork / Kenney CC0 kit props, recoloured, with sight-line culling of anything blocking a camera.
    - `paint.ts`: HD Canvas2D painted textures with seams painted in as dark tints.
    - `world.ts`: sky shader, fog = horizon colour, river, per-frame posing, sun frozen per shot and camera-relative.
 6. **Characters.**
@@ -68,21 +94,55 @@ User rules that apply:
    - Event table → synthesized SFX plus an original score ducked under the voice.
    - Output: mix.wav (48 kHz, exact length), stems and cues.md.
    - Lock the picture's time constants before the sound is made. Any later timing change means re-running the sound.
-9. **Look checks.** Run `node scripts/bridge-stills.mjs out/<name>/x_ 100,400 0.5`.
-   - Set `BRIDGE_ENTRY=src/sandboxes/<n>/index.tsx` to render a sandbox copy.
+9. **Look checks (GPU-accelerated stills).**
+   - Run: `node scripts/bridge-stills.mjs out/<name>/x_ 100,400 0.5` (automatically runs with GPU rasterization and EGL/ANGLE hardware acceleration).
    - Make side-by-sides against reference frames with `python scripts/sbs_sheet.py out.jpg --ours ... --ref ...`.
-   - Send them to an Opus max verifier: 1-3 images, a ≤200-word verdict.
-10. **Final render.**
-    - `npx remotion render src/index.ts <Comp> out/<name>/video.mp4 --codec h264 --crf 16 --scale 1.3333`
+   - Send the sheet to Gemini Vision: evaluate against target metrics, score 1-10 across 8 dimensions, provide a concise verdict and numbered frame fixes.
+10. **Final render (GPU-accelerated).**
+    - Always pass GPU hardware acceleration flags:
+      ```bash
+      # On Linux / Arch (EGL backend):
+      npx remotion render src/index.ts <Comp> out/<name>/video.mp4 --codec h264 --crf 16 --scale 1.3333 --gl egl \
+        --chromium-options='{"args":["--enable-gpu","--use-gl=egl","--ignore-gpu-blocklist","--enable-gpu-rasterization"]}'
+
+      # On Windows (ANGLE backend):
+      npx remotion render src/index.ts <Comp> out/<name>/video.mp4 --codec h264 --crf 16 --scale 1.3333 --gl angle \
+        --chromium-options='{"args":["--enable-gpu","--use-gl=angle","--ignore-gpu-blocklist"]}'
+      ```
     - Mux with `-map 0:v:0 -map 1:a:0` (Remotion writes a silent audio track).
     - QA: `python scripts/short_qa.py final.mp4 out/<name>/qa shots.json` checks every frame for black, white, frozen and pop frames, plus loudness and sheets.
-    - Fix anything it finds, then run a deep Opus audit.
-11. **Deliver.** SendUserFile the final mp4, update memory, write notes.
+    - Fix anything it finds, then run a final visual audit.
+11. **Deliver.** Provide the final mp4 path, summarize shot count and mix specs.
+
+## Premade 3D Assets: Polyfork Catalog (47 Kits, 3,086 Models)
+The skill includes the full offline database of [Polyfork Catalog](https://github.com/lucas-martinic/polyfork-catalog) at `references/polyfork/catalog.json`. All assets are low-poly (300–2,000 tris), Y-up, meter-scaled, centered at y=0, and download directly from `https://polyfork.dev/cdn/<id>.glb`.
+
+### Key Themed Kits:
+- **Towns & Architecture:** Medieval Village (`medieval-village-kit-ca0b43`), Little Tokyo (`japanese-suburban-city-street-baa482`), Medieval Japan (`medieval-japan-cb01ad`), Frontier Town (`frontier-town-a0085b`), NYC (`nyc-city-kit-fbca88`), Roadside Americana (`roadside-americana-50d40c`).
+- **Nature & Landscape:** Nature & Forest (`nature-forest-kit-f29d6a`), Campground & Lake (`campground-lake-ad32b0`), Prehistoric Valley (`prehistoric-valley-8638dc`), Coral Reef (`coral-reef-a7128a`), Cozy Farm (`cozy-farm-cc979f`).
+- **Transportation & Sci-Fi:** Countryside Railway (`countryside-railway-9b4c57`), Retro Cars (`racing-cars-kit-660d53`), Space Base (`space-base-kit-cf65de`), Spaceship Wars (`spaceship-wars-kit-234642`), Airport (`airport-43b137`).
+- **Props, UI & Interiors:** 3D UI kit (`3d-ui-kit-5635f7`), Dungeon & Crypt (`dungeon-crypt-c27d93`), Hospital (`hospital-kit-2ebfcb`), Hotel Casino (`casino-3dd029`), Pirate Cove (`pirate-cove-2ebea4`).
+
+### CLI Commands:
+```bash
+# 1. Search assets by keyword or filter
+python scripts/polyfork.py search "tree" --limit 10
+python scripts/polyfork.py search "car" --type vehicle --max-triangles 1500
+
+# 2. Browse themed kits
+python scripts/polyfork.py kits --search "train"
+python scripts/polyfork.py kit countryside-railway-9b4c57
+
+# 3. Download asset GLB to Remotion public/ folder
+python scripts/polyfork.py download steam-locomotive-3b8c21 --out-dir ./public/models
+
+# 4. Generate ready-to-paste Three.js snippet
+python scripts/polyfork.py snippet steam-locomotive-3b8c21
+```
 
 ## Final look values (bridge after 4 verifier rounds; all in `templates/bridge/`)
 Start every new short from `templates/bridge/` (copy to `src/videos/<name>/`): the look lives in these values, the
-story lives in story.ts / build.ts layout / cast.ts roles. Opus max scores at the end: colour day 7, golden 5-6,
-lighting 5-6, ink 6, textures 5-6, characters 7, depth 6-7, composition 6-7 (from 5/3/4/5/4/7/4/6 at the start).
+story lives in story.ts / build.ts layout / cast.ts roles.
 - **Light presets** (`lights.ts`, sun camera-relative and frozen per shot):
   - day: az 75 / el 48, lit [1.58,1.5,1.33], shade [.30,.29,.36], lift [.05,.06,.11] (cool tint ONLY in shade), sky
     top #3e7fd2 → horizon #b8d0ec, fog = horizon, 25→300 m, uSat 1.08, ~15 % blue haze past 60 m.
@@ -127,37 +187,34 @@ lighting 5-6, ink 6, textures 5-6, characters 7, depth 6-7, composition 6-7 (fro
   - Walk bob 3-7 %, lean 1-7°, planted feet.
   - Blinks every 0.5-2.3 s, lasting 4 f.
 
-## Look-match loop (how the bridge look was reached; reuse for any "make it look like X" pass)
-1. **Measure the reference first.** One analysis agent per topic (motion, depth, textures, characters, lighting, outlines, grade), each writing numbers, not adjectives, to `references/reports/<topic>.md`. Shared brief: `compare/CONTEXT.md`. Reports are the source of truth for every agent after.
-2. **Sandboxes, one owner per file.** Copy the project folder to `src/videos/<name>_{cam,world,mat,char,post}` with entries `src/sandboxes/<n>/index.tsx` (same `index.tsx` as main, only the import path changed). Ownership used for the bridge:
-   - cam: story.ts (camera keys, cuts, kicks, DOF table, foreground props)
-   - world: world.ts, lights.ts, shade.ts, grade.ts (sun, sky, fog, river, colour, grade)
-   - mat: paint.ts, build.ts (painted textures, buildings, props)
-   - char: toon.ts, cast.ts, cardshade.ts (character drawing, posing, card lighting, fx cards)
-   - post: ink.ts, Bridge.tsx, lensblur.ts (outline pass, composer, lens blur, bloom)
-   Agents only edit their own files in their own sandbox and render stills with `BRIDGE_ENTRY=src/sandboxes/<n>/index.tsx node scripts/bridge-stills.mjs out/<name>/<n>/x_ <frames> 0.5`.
-3. **Merge** with `python scripts/bridge_merge.py [cam,world,mat,char,post]` (backs main up to `backup/bridge_<time>/`, copies owned files only). Then `npx tsc --noEmit` (filter to the project folder), then **re-sync every sandbox from main** (`cp -f src/videos/<name>/* src/videos/<name>_<n>/`) before the next round.
-4. **Verify** with a fresh Opus max agent: side-by-side sheets (`python scripts/sbs_sheet.py out.jpg --ours a b --ref r1 r2`), score each area out of 10 (colour day / golden, lighting, ink, textures, characters, depth, composition) plus a numbered fix list with frame numbers. Map each fix to the file owner and resume that owner's agent with SendMessage (keeps its context). Bridge scores: round 1 5/3/4/5/4/7/4/6 → round 2 5/4/5/6/4/7/6/6 → round 3 see notes.
-5. Contracts between owners live in exported constants (e.g. `NOINK` layer from ink.ts, `dofAt`/`FOREGROUND` from story.ts, `LIGHTS`/`LOOK` from lights.ts). Changing a contract means telling every owner that reads it.
+## Look-match loop (Gemini workflow)
+1. **Measure the reference first.** `references/reports/*.md` contains exact metrics for motion, depth, textures, characters, lighting, outlines, and color grading. Shared brief: `references/reports/CONTEXT.md`.
+2. **Context Window Advantage:** With Gemini's 1M–2M token context, you do not need brittle multi-agent sandbox splits unless desired. Gemini can hold and edit `story.ts`, `world.ts`, `toon.ts`, `paint.ts`, `ink.ts`, and `lights.ts` directly in the project directory.
+3. **Verify with Gemini Vision:**
+   - Render preview stills: `node scripts/bridge-stills.mjs out/<name>/x_ 100,400 0.5`
+   - Generate side-by-side sheets: `python scripts/sbs_sheet.py out.jpg --ours out/<name>/x_100.jpg out/<name>/x_400.jpg --ref references/frames/short01_0060.jpg references/frames/short01_0180.jpg`
+   - Gemini Vision inspects `out.jpg` and scores each area out of 10 (colour day / golden, lighting, ink, textures, characters, depth, composition) against the reference reports, providing exact frame fix recommendations.
+4. Contracts between components live in exported constants (`NOINK` layer from ink.ts, `dofAt`/`FOREGROUND` from story.ts, `LIGHTS`/`LOOK` from lights.ts).
 
-## Gotchas
-- Kenney nature-kit materials are teal: recolour them by material name in build.ts.
-- Cameras end up inside houses: the sight-line culler in build.ts/world.ts removes anything blocking any camera ray.
-- Ink in the same merged effect pass as DOF gets overwritten. Ink must be its own pass before the blur.
-- Pixel-sized post parameters must scale with resolution: stills are at 0.5, the final at 1.333. R3F clamps dpr to ≥ 1, so `--scale 0.5` stills still render a 1080x1920 buffer.
-- **Disk:** every Remotion bundle copies `public/` (~1.3 GB) into `the temp folder\remotion-webpack-bundle-*` and never deletes it. 60+ GB filled the system drive during the bridge passes and a render died with ENOSPC. Always render with `export TEMP='<big drive>/remotion-tmp' TMP='<big drive>/remotion-tmp'` (bridge-stills.mjs sets it itself) and ask the user before deleting old bundle folders in the shared the temp folder (auto mode blocks the sweep). <big drive>/remotion-tmp fills too (~500 folders / 110 GB after the 4 bridge rounds): when a project is finished and nothing is rendering, delete its `remotion-webpack-bundle-*` and `puppeteer_dev_chrome_profile-*` folders there.
-- In JS strings write `"<big drive>/remotion-tmp"`, never `"<big drive>\remotion-tmp"` (`\r` becomes a carriage return).
+## GPU Acceleration & Platform Gotchas
+- **Always Render with GPU:**
+  - **Linux / Arch:** WebGL uses hardware-accelerated `--gl=egl` via Mesa Intel / NVIDIA drivers (`--enable-gpu --use-gl=egl --ignore-gpu-blocklist --enable-gpu-rasterization`).
+  - **Windows:** Uses `--gl=angle` (`--use-gl=angle`).
+  - **Voice & Alignment:** `generate_voice.py` automatically checks `torch.cuda.is_available()` and executes Chatterbox and `faster-whisper` on GPU with `float16`.
+- **Arch Linux & Linux Disk/Tmpfs:** On Linux, `/tmp` is typically a `tmpfs` RAM disk. Every Remotion bundle copies `public/` (~1.3 GB) and can quickly fill `/tmp` with `ENOSPC`. Always keep `REMOTION_TMP` pointed to a physical drive (e.g. `~/.cache/remotion-tmp` or `/var/tmp/remotion-tmp`).
+- **Browser Executable:** `bridge-stills.mjs` automatically searches for Google Chrome / Chromium on Linux/Arch (`~/.local/bin/google-chrome`, `/usr/bin/google-chrome-stable`, `/usr/bin/chromium`), or respects `PUPPETEER_EXECUTABLE_PATH`.
+- **Sight-lines:** Cameras end up inside houses: the sight-line culler in build.ts/world.ts removes anything blocking any camera ray.
+- **Ink & Post-Processing:** Ink in the same merged effect pass as DOF gets overwritten. Ink must be its own pass before the blur.
+- Pixel-sized post parameters must scale with resolution: stills are at 0.5, the final at 1.333.
 - Remotion writes a silent audio track: mux with `-map 0:v:0 -map 1:a:0`.
-- Sub-agents can't write report files in this harness: ask them for a ≤150-word final message and save it yourself to `out/<name>/<n>/REPORT.md`.
-- Scratch `.ts` files inside `out/` break `tsc`: name them `.txt`.
-- 2K renders run ~4 fps (≈10 min for 67 s). Stills at 0.5 take 3-8 s each after a ~40 s bundle.
-- Film grain at 2.5 % made the 2K file 910 MB instead of ~250 MB and will turn to mush on YouTube; the reference has none. Keep it off.
+- 2K renders run ~4 fps (≈10 min for 67 s on GPU). Stills at 0.5 take 3-8 s each after bundling.
+- Film grain at 2.5 % quadruples file size and will turn to mush on YouTube; keep it off.
 
-## Readability traps the verifier caught (check every new prop/shot for these)
+## Readability traps the verifier caught
 - **A swing drawn as one rope that disappears behind the kid reads as a HANGING.** Always two ropes to a wide plank
   with the kid between them (`swingKid` in toon.ts), and a frame whose legs clear the arc (A-frame at each end).
 - Props or flotsam closer than ~2 m to a lens become huge cut-off blobs at the frame edge. When a camera moves, re-check
-  every prop near its new position (the river cameras moved into the floating hats).
+  every prop near its new position.
 - A foreground bush cut by the frame edge reads as a "green ball"; a foreground prop must be recognisable or gone.
 - Flags: red + yellow star/diamond reads as Vietnam's. Use a period-correct flag (St George's cross for England 1831).
 - Painted signs lit by a side sun go grey-blue and unreadable: give the sign face an unlit material.
